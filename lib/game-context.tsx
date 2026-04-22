@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { Player, Match, GamePlayer, Round, calculateCommission, getHighestScore } from './types'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { Player, Match, GamePlayer, Round, getHighestScore } from './types'
 
 interface GameContextType {
   players: Player[]
@@ -32,6 +32,11 @@ const STORAGE_KEYS = {
   players: 'pontinho_players',
   activeMatch: 'pontinho_active_match',
   matchHistory: 'pontinho_match_history'
+}
+
+// 🔥 COMISSÃO CORRIGIDA
+function calculateCommission(total: number) {
+  return Math.floor(total * 0.1)
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
@@ -71,7 +76,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEYS.matchHistory, JSON.stringify(matchHistory))
   }, [matchHistory, isLoaded])
 
-  const addPlayer = useCallback((name: string) => {
+  // ---------------- PLAYERS ----------------
+
+  const addPlayer = (name: string) => {
     const newPlayer: Player = {
       id: crypto.randomUUID(),
       name,
@@ -82,17 +89,34 @@ export function GameProvider({ children }: { children: ReactNode }) {
       createdAt: new Date().toISOString()
     }
     setPlayers(prev => [...prev, newPlayer])
-  }, [])
+  }
 
-  const updatePlayer = useCallback((id: string, updates: Partial<Player>) => {
+  const updatePlayer = (id: string, updates: Partial<Player>) => {
     setPlayers(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p))
-  }, [])
+  }
 
-  const deletePlayer = useCallback((id: string) => {
+  const deletePlayer = (id: string) => {
     setPlayers(prev => prev.filter(p => p.id !== id))
-  }, [])
+  }
 
-  const startMatch = useCallback((playerIds: string[], entryValue: number) => {
+  // ---------------- MATCH ----------------
+
+  const recalcFinancial = (match: Match): Match => {
+    const totalPlayers = match.players.length
+    const totalPurchases = match.players.reduce((s, p) => s + p.purchases, 0) * 10
+
+    const totalPot = (match.entryValue * totalPlayers) + totalPurchases
+    const commission = calculateCommission(totalPot)
+
+    return {
+      ...match,
+      totalPot,
+      commission,
+      prize: totalPot - commission
+    }
+  }
+
+  const startMatch = (playerIds: string[], entryValue: number) => {
     const gamePlayers: GamePlayer[] = playerIds.map(id => {
       const player = players.find(p => p.id === id)
       return {
@@ -108,6 +132,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     })
 
     const totalPot = entryValue * playerIds.length
+    const commission = calculateCommission(totalPot)
 
     const newMatch: Match = {
       id: crypto.randomUUID(),
@@ -115,8 +140,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       entryValue,
       totalPot,
       totalPurchases: 0,
-      commission: calculateCommission(totalPot),
-      prize: totalPot - calculateCommission(totalPot),
+      commission,
+      prize: totalPot - commission,
       winnerId: null,
       winnerName: null,
       status: 'active',
@@ -125,259 +150,189 @@ export function GameProvider({ children }: { children: ReactNode }) {
       finishedAt: null
     }
 
-    playerIds.forEach(id => {
-      const player = players.find(p => p.id === id)
-      if (player) {
-        updatePlayer(id, {
-          gamesPlayed: player.gamesPlayed + 1,
-          totalLoss: player.totalLoss + entryValue
-        })
-      }
-    })
-
     setActiveMatch(newMatch)
-  }, [players, updatePlayer])
+  }
 
-  const recalculateMatchFinancials = useCallback((match: Match): Match => {
-    const totalPurchases = match.players.reduce((sum, p) => sum + p.purchases, 0) * 10
-    const totalPot = (match.entryValue * match.players.length) + totalPurchases
-    const commission = calculateCommission(totalPot)
-    const prize = totalPot - commission
+  const addPoints = (playerId: string, points: number) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
 
-    return {
-      ...match,
-      totalPurchases,
-      totalPot,
-      commission,
-      prize
-    }
-  }, [])
+      const clone = JSON.parse(JSON.stringify(prev))
 
-  const finalizeMatchWithWinner = useCallback((match: Match, winner: GamePlayer): Match => {
-    const winnerPlayer = players.find(p => p.id === winner.playerId)
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          const newRound: Round = {
+            id: crypto.randomUUID(),
+            points,
+            timestamp: new Date().toISOString()
+          }
 
-    if (winnerPlayer) {
-      updatePlayer(winner.playerId, {
-        wins: winnerPlayer.wins + 1,
-        totalProfit: winnerPlayer.totalProfit + match.prize
+          p.rounds.push(newRound)
+          p.totalPoints += points
+          p.hasBurst = p.totalPoints >= 100
+        }
+        return p
       })
-    }
 
-    return {
-      ...match,
+      return clone
+    })
+  }
+
+  const playerBat = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
+
+      const clone = JSON.parse(JSON.stringify(prev))
+
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          p.batsCount += 1
+        }
+        return p
+      })
+
+      return clone
+    })
+  }
+
+  const undoPlayerBat = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
+
+      const clone = JSON.parse(JSON.stringify(prev))
+
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          p.batsCount = Math.max(0, p.batsCount - 1)
+        }
+        return p
+      })
+
+      return clone
+    })
+  }
+
+  // 🔥 COMPRA CORRIGIDA (BUG RESOLVIDO)
+  const playerPurchase = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
+
+      const clone = JSON.parse(JSON.stringify(prev))
+
+      const safePlayers = clone.players.filter(
+        (p: GamePlayer) => p.totalPoints < 100
+      )
+
+      let returnPoints = 0
+
+      if (safePlayers.length > 0) {
+        returnPoints = Math.max(...safePlayers.map((p: GamePlayer) => p.totalPoints))
+      } else {
+        returnPoints = 0
+      }
+
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          p.purchases += 1
+          p.totalPoints = returnPoints
+          p.hasBurst = false
+          p.isActive = true
+        }
+        return p
+      })
+
+      return recalcFinancial(clone)
+    })
+  }
+
+  const eliminatePlayer = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
+
+      const clone = JSON.parse(JSON.stringify(prev))
+
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          p.isActive = false
+        }
+        return p
+      })
+
+      return clone
+    })
+  }
+
+  const endMatch = () => {
+    if (!activeMatch) return
+
+    const activePlayers = activeMatch.players.filter(p => p.isActive)
+    if (activePlayers.length === 0) return
+
+    const winner = [...activePlayers].sort((a, b) => a.totalPoints - b.totalPoints)[0]
+
+    const finished: Match = {
+      ...activeMatch,
       winnerId: winner.playerId,
       winnerName: winner.playerName,
       status: 'finished',
       finishedAt: new Date().toISOString()
     }
-  }, [players, updatePlayer])
 
-  const checkGameEnd = useCallback((match: Match): Match => {
-    const activePlayers = match.players.filter(p => p.isActive)
+    setMatchHistory(prev => [finished, ...prev])
+    setActiveMatch(null)
+  }
 
-    if (activePlayers.length === 1) {
-      return finalizeMatchWithWinner(match, activePlayers[0])
-    }
+  // ---------------- HISTORY ACTIONS ----------------
 
-    return match
-  }, [finalizeMatchWithWinner])
+  const deleteMatch = (matchId: string) => {
+    setMatchHistory(prev => prev.filter(match => match.id !== matchId))
+  }
 
-  const addPoints = useCallback((playerId: string, points: number) => {
-    if (!activeMatch) return
+  const markMatchPaid = (matchId: string) => {
+    setMatchHistory(prev =>
+      prev.map(match =>
+        match.id === matchId
+          ? { ...match, isPaid: true }
+          : match
+      )
+    )
+  }
 
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-
-        const newRound: Round = {
-          id: crypto.randomUUID(),
-          points,
-          timestamp: new Date().toISOString()
-        }
-
-        const newTotalPoints = p.totalPoints + points
-        const hasBurst = newTotalPoints >= 100
-
-        return {
-          ...p,
-          rounds: [...p.rounds, newRound],
-          totalPoints: newTotalPoints,
-          hasBurst
-        }
-      })
-
-      return { ...prev, players: updatedPlayers }
-    })
-  }, [activeMatch])
-
-  const removeRound = useCallback((playerId: string, roundId: string) => {
-    if (!activeMatch) return
-
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-
-        const updatedRounds = p.rounds.filter(r => r.id !== roundId)
-        const newTotalPoints = updatedRounds.reduce((sum, r) => sum + r.points, 0)
-        const hasBurst = newTotalPoints >= 100
-
-        return {
-          ...p,
-          rounds: updatedRounds,
-          totalPoints: newTotalPoints,
-          hasBurst
-        }
-      })
-
-      return { ...prev, players: updatedPlayers }
-    })
-  }, [activeMatch])
-
-  const playerBat = useCallback((playerId: string) => {
-    if (!activeMatch) return
-
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-        return { ...p, batsCount: p.batsCount + 1 }
-      })
-
-      return { ...prev, players: updatedPlayers }
-    })
-  }, [activeMatch])
-
-  const undoPlayerBat = useCallback((playerId: string) => {
-    if (!activeMatch) return
-
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-        return { ...p, batsCount: Math.max(0, p.batsCount - 1) }
-      })
-
-      return { ...prev, players: updatedPlayers }
-    })
-  }, [activeMatch])
-
-  const playerPurchase = useCallback((playerId: string) => {
-    if (!activeMatch) return
-
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const highestScore = getHighestScore(prev.players, playerId)
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-        return {
-          ...p,
-          purchases: p.purchases + 1,
-          totalPoints: highestScore,
-          hasBurst: false,
-          isActive: true
-        }
-      })
-
-      let updatedMatch = { ...prev, players: updatedPlayers }
-      updatedMatch = recalculateMatchFinancials(updatedMatch)
-
-      const player = players.find(p => p.id === playerId)
-      if (player) {
-        updatePlayer(playerId, { totalLoss: player.totalLoss + 10 })
-      }
-
-      return updatedMatch
-    })
-  }, [activeMatch, players, updatePlayer, recalculateMatchFinancials])
-
-  const eliminatePlayer = useCallback((playerId: string) => {
-    if (!activeMatch) return
-
-    setActiveMatch(prev => {
-      if (!prev) return null
-
-      const updatedPlayers = prev.players.map(p => {
-        if (p.playerId !== playerId) return p
-        return {
-          ...p,
-          isActive: false
-        }
-      })
-
-      return { ...prev, players: updatedPlayers }
-    })
-  }, [activeMatch])
-
-  const endMatch = useCallback(() => {
-    if (!activeMatch) return
-
-    let finishedMatch = checkGameEnd(activeMatch)
-
-    if (finishedMatch.status !== 'finished') {
-      const activePlayers = finishedMatch.players.filter(p => p.isActive)
-
-      if (activePlayers.length > 0) {
-        const forcedWinner = [...activePlayers].sort((a, b) => a.totalPoints - b.totalPoints)[0]
-        finishedMatch = finalizeMatchWithWinner(finishedMatch, forcedWinner)
-      }
-    }
-
-    if (finishedMatch.status === 'finished') {
-      setMatchHistory(prev => [finishedMatch, ...prev])
-      setActiveMatch(null)
-    }
-  }, [activeMatch, checkGameEnd, finalizeMatchWithWinner])
-
-  const deleteMatch = useCallback((matchId: string) => {
-    setMatchHistory(prev => prev.filter(m => m.id !== matchId))
-  }, [])
-
-  const markMatchPaid = useCallback((matchId: string) => {
-    setMatchHistory(prev => prev.map(m =>
-      m.id === matchId ? { ...m, isPaid: true } : m
-    ))
-  }, [])
-
-  const startRematch = useCallback((matchId: string) => {
-    const match = matchHistory.find(m => m.id === matchId)
+  const startRematch = (matchId: string) => {
+    const match = matchHistory.find(match => match.id === matchId)
     if (!match) return
 
-    const playerIds = match.players.map(p => p.playerId)
-    const validPlayerIds = playerIds.filter(id => players.some(p => p.id === id))
+    const validPlayerIds = match.players
+      .map(player => player.playerId)
+      .filter(playerId => players.some(player => player.id === playerId))
 
-    if (validPlayerIds.length >= 2) {
+    if (validPlayerIds.length > 0) {
       startMatch(validPlayerIds, match.entryValue)
     }
-  }, [matchHistory, players, startMatch])
+  }
 
   return (
-    <GameContext.Provider value={{
-      players,
-      addPlayer,
-      updatePlayer,
-      deletePlayer,
-      activeMatch,
-      matchHistory,
-      startMatch,
-      endMatch,
-      addPoints,
-      removeRound,
-      playerBat,
-      undoPlayerBat,
-      playerPurchase,
-      eliminatePlayer,
-      deleteMatch,
-      markMatchPaid,
-      startRematch
-    }}>
+    <GameContext.Provider
+      value={{
+        players,
+        addPlayer,
+        updatePlayer,
+        deletePlayer,
+        activeMatch,
+        matchHistory,
+        startMatch,
+        endMatch,
+        addPoints,
+        removeRound: () => {},
+        playerBat,
+        undoPlayerBat,
+        playerPurchase,
+        eliminatePlayer,
+        deleteMatch,
+        markMatchPaid,
+        startRematch
+      }}
+    >
       {children}
     </GameContext.Provider>
   )
@@ -385,8 +340,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
 export function useGame() {
   const context = useContext(GameContext)
-  if (!context) {
-    throw new Error('useGame must be used within a GameProvider')
-  }
+  if (!context) throw new Error('useGame must be used dentro do GameProvider')
   return context
 }

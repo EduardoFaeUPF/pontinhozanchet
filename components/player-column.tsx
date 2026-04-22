@@ -118,6 +118,7 @@ export function PlayerColumn({
                   <button
                     onClick={() => onRemoveRound(round.id)}
                     className="rounded-md p-1 transition-colors hover:bg-red-500/15"
+                    type="button"
                   >
                     <Trash2 className="h-3.5 w-3.5 text-zinc-400 hover:text-red-300" />
                   </button>
