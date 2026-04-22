@@ -37,7 +37,7 @@ export function PlayerColumn({
   const [isAddPointsOpen, setIsAddPointsOpen] = useState(false)
   const [pointsInput, setPointsInput] = useState('')
 
-  const pointsRemaining = Math.max(0, 100 - player.totalPoints)
+  const pointsRemaining = Math.max(0, 99 - player.totalPoints)
   const hasBurst = player.totalPoints >= 100
   const highestScore = getHighestScore(allPlayers, player.playerId)
 

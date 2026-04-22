@@ -19,6 +19,7 @@ interface GameContextType {
   playerBat: (playerId: string) => void
   undoPlayerBat: (playerId: string) => void
   playerPurchase: (playerId: string) => void
+  removePurchase: (playerId: string) => void
   eliminatePlayer: (playerId: string) => void
 
   deleteMatch: (matchId: string) => void
@@ -36,7 +37,14 @@ const STORAGE_KEYS = {
 
 // 🔥 COMISSÃO CORRIGIDA
 function calculateCommission(total: number) {
-  return Math.floor(total * 0.1)
+  if (total < 60) return 0
+
+  if (total < 150) return 10
+
+  const faixa = Math.floor((total - 150) / 100)
+  const comissao = (faixa + 2) * 10
+
+  return Math.min(comissao, 130)
 }
 
 export function GameProvider({ children }: { children: ReactNode }) {
@@ -245,6 +253,43 @@ export function GameProvider({ children }: { children: ReactNode }) {
     })
   }
 
+const removePurchase = (playerId: string) => {
+  setActiveMatch(prev => {
+    if (!prev) return prev
+
+    return {
+      ...prev,
+      players: prev.players.map(p => {
+        if (p.playerId !== playerId) return p
+
+        return {
+          ...p,
+          purchases: Math.max(p.purchases - 1, 0)
+        }
+      })
+    }
+  })
+}
+
+const removeRound = (playerId: string, roundId: string) => {
+  setActiveMatch(prev => {
+    if (!prev) return null
+
+    const clone = JSON.parse(JSON.stringify(prev))
+
+    clone.players = clone.players.map((p: GamePlayer) => {
+      if (p.playerId === playerId) {
+        p.rounds = p.rounds.filter((round: Round) => round.id !== roundId)
+        p.totalPoints = p.rounds.reduce((sum: number, round: Round) => sum + round.points, 0)
+        p.hasBurst = p.totalPoints >= 100
+      }
+      return p
+    })
+
+    return clone
+  })
+}
+
   const eliminatePlayer = (playerId: string) => {
     setActiveMatch(prev => {
       if (!prev) return null
@@ -323,7 +368,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         startMatch,
         endMatch,
         addPoints,
-        removeRound: () => {},
+        removeRound,
         playerBat,
         undoPlayerBat,
         playerPurchase,
