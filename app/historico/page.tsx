@@ -45,19 +45,21 @@ export default function HistoricoPage() {
 
   const filteredMatches = useMemo(() => {
     return matchHistory.filter(match => {
-      // Filter by player
       if (filterPlayer !== 'all') {
         const hasPlayer = match.players.some(p => p.playerId === filterPlayer)
         if (!hasPlayer) return false
       }
 
-      // Filter by status
       if (filterStatus === 'paid' && !match.isPaid) return false
       if (filterStatus === 'pending' && match.isPaid) return false
 
-      // Filter by date
       if (filterDate) {
-        const matchDate = new Date(match.startedAt).toISOString().split('T')[0]
+        const date = new Date(match.startedAt)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const matchDate = `${year}-${month}-${day}`
+
         if (matchDate !== filterDate) return false
       }
 
@@ -79,7 +81,6 @@ export default function HistoricoPage() {
       <Sidebar />
       <main className="flex-1 ml-64 p-8">
         <div className="max-w-6xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground">Historico de Partidas</h1>
             <p className="text-muted-foreground mt-2">
@@ -87,7 +88,6 @@ export default function HistoricoPage() {
             </p>
           </div>
 
-          {/* Stats Summary */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
             <Card className="bg-card border-border">
               <CardContent className="py-4">
@@ -132,7 +132,6 @@ export default function HistoricoPage() {
             </Card>
           </div>
 
-          {/* Filters */}
           <Card className="bg-card border-border mb-6">
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
@@ -200,7 +199,6 @@ export default function HistoricoPage() {
             </CardContent>
           </Card>
 
-          {/* Matches List */}
           {filteredMatches.length === 0 ? (
             <Card className="bg-card border-border">
               <CardContent className="py-12 text-center">
@@ -219,7 +217,6 @@ export default function HistoricoPage() {
                   <CardContent className="py-4">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        {/* Match Header */}
                         <div className="flex items-center gap-4 mb-3">
                           <div className="flex items-center gap-2">
                             <Trophy className="w-5 h-5 text-accent" />
@@ -237,7 +234,6 @@ export default function HistoricoPage() {
                           </span>
                         </div>
 
-                        {/* Match Details */}
                         <div className="flex flex-wrap gap-6 text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <Users className="w-4 h-4" />
@@ -265,7 +261,6 @@ export default function HistoricoPage() {
                           </div>
                         </div>
 
-                        {/* Players List */}
                         <div className="mt-3 flex flex-wrap gap-2">
                           {match.players.map((player) => (
                             <span 
@@ -284,7 +279,6 @@ export default function HistoricoPage() {
                         </div>
                       </div>
 
-                      {/* Actions */}
                       <div className="flex items-center gap-2 ml-4">
                         {!match.isPaid && (
                           <Button 

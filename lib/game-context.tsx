@@ -203,25 +203,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     })
   }
 
-const undoPlayerBat = (playerId: string) => {
-  setActiveMatch(prev => {
-    if (!prev) return prev
+  const undoPlayerBat = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return prev
 
-    const updatedPlayers = prev.players.map(p => {
-      if (p.playerId !== playerId) return p
+      const updatedPlayers = prev.players.map(p => {
+        if (p.playerId !== playerId) return p
 
-      return {
-        ...p,
-        hasBat: false
-      }
+        return {
+          ...p,
+          hasBat: false
+        }
+      })
+
+      return recalcFinancial({
+        ...prev,
+        players: updatedPlayers
+      })
     })
-
-    return recalcFinancial({
-      ...prev,
-      players: updatedPlayers
-    })
-  })
-}
+  }
 
   // 🔥 COMPRA CORRIGIDA (BUG RESOLVIDO)
   const playerPurchase = (playerId: string) => {
@@ -256,42 +256,42 @@ const undoPlayerBat = (playerId: string) => {
     })
   }
 
-const removePurchase = (playerId: string) => {
-  setActiveMatch(prev => {
-    if (!prev) return prev
+  const removePurchase = (playerId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return prev
 
-    return {
-      ...prev,
-      players: prev.players.map(p => {
-        if (p.playerId !== playerId) return p
+      return {
+        ...prev,
+        players: prev.players.map(p => {
+          if (p.playerId !== playerId) return p
 
-        return {
-          ...p,
-          purchases: Math.max(p.purchases - 1, 0)
-        }
-      })
-    }
-  })
-}
-
-const removeRound = (playerId: string, roundId: string) => {
-  setActiveMatch(prev => {
-    if (!prev) return null
-
-    const clone = JSON.parse(JSON.stringify(prev))
-
-    clone.players = clone.players.map((p: GamePlayer) => {
-      if (p.playerId === playerId) {
-        p.rounds = p.rounds.filter((round: Round) => round.id !== roundId)
-        p.totalPoints = p.rounds.reduce((sum: number, round: Round) => sum + round.points, 0)
-        p.hasBurst = p.totalPoints >= 100
+          return {
+            ...p,
+            purchases: Math.max(p.purchases - 1, 0)
+          }
+        })
       }
-      return p
     })
+  }
 
-    return clone
-  })
-}
+  const removeRound = (playerId: string, roundId: string) => {
+    setActiveMatch(prev => {
+      if (!prev) return null
+
+      const clone = JSON.parse(JSON.stringify(prev))
+
+      clone.players = clone.players.map((p: GamePlayer) => {
+        if (p.playerId === playerId) {
+          p.rounds = p.rounds.filter((round: Round) => round.id !== roundId)
+          p.totalPoints = p.rounds.reduce((sum: number, round: Round) => sum + round.points, 0)
+          p.hasBurst = p.totalPoints >= 100
+        }
+        return p
+      })
+
+      return clone
+    })
+  }
 
   const eliminatePlayer = (playerId: string) => {
     setActiveMatch(prev => {
@@ -325,6 +325,26 @@ const removeRound = (playerId: string, roundId: string) => {
       status: 'finished',
       finishedAt: new Date().toISOString()
     }
+
+    setPlayers(prev =>
+      prev.map(player => {
+        const matchPlayer = activeMatch.players.find(p => p.playerId === player.id)
+
+        if (!matchPlayer) return player
+
+        const isWinner = player.id === winner.playerId
+
+        return {
+          ...player,
+          gamesPlayed: (player.gamesPlayed || 0) + 1,
+          wins: isWinner ? (player.wins || 0) + 1 : (player.wins || 0),
+          totalProfit: isWinner
+            ? (player.totalProfit || 0) + finished.prize
+            : (player.totalProfit || 0),
+          totalLoss: (player.totalLoss || 0) + (matchPlayer.purchases * 10)
+        }
+      })
+    )
 
     setMatchHistory(prev => [finished, ...prev])
     setActiveMatch(null)
@@ -375,6 +395,7 @@ const removeRound = (playerId: string, roundId: string) => {
         playerBat,
         undoPlayerBat,
         playerPurchase,
+        removePurchase,
         eliminatePlayer,
         deleteMatch,
         markMatchPaid,
