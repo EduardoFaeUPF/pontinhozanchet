@@ -203,22 +203,25 @@ export function GameProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  const undoPlayerBat = (playerId: string) => {
-    setActiveMatch(prev => {
-      if (!prev) return null
+const undoPlayerBat = (playerId: string) => {
+  setActiveMatch(prev => {
+    if (!prev) return prev
 
-      const clone = JSON.parse(JSON.stringify(prev))
+    const updatedPlayers = prev.players.map(p => {
+      if (p.playerId !== playerId) return p
 
-      clone.players = clone.players.map((p: GamePlayer) => {
-        if (p.playerId === playerId) {
-          p.batsCount = Math.max(0, p.batsCount - 1)
-        }
-        return p
-      })
-
-      return clone
+      return {
+        ...p,
+        hasBat: false
+      }
     })
-  }
+
+    return recalcFinancial({
+      ...prev,
+      players: updatedPlayers
+    })
+  })
+}
 
   // 🔥 COMPRA CORRIGIDA (BUG RESOLVIDO)
   const playerPurchase = (playerId: string) => {
