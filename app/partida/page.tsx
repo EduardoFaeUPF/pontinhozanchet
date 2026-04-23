@@ -174,7 +174,27 @@ export default function PartidaPage() {
               </AlertDialogContent>
             </AlertDialog>
           </div>
+        </div>
 
+        <div className="overflow-x-auto pb-4">
+          <div className="flex min-w-max gap-4">
+            {activeMatch.players.map((player) => (
+              <div key={player.playerId} className="w-[230px] shrink-0">
+                <PlayerColumn
+                  player={player}
+                  allPlayers={activeMatch.players}
+                  onAddPoints={(points) => addPoints(player.playerId, points)}
+                  onRemoveRound={(roundId) => removeRound(player.playerId, roundId)}
+                  onBat={() => playerBat(player.playerId)}
+                  onPurchase={() => playerPurchase(player.playerId)}
+                  onEliminate={() => eliminatePlayer(player.playerId)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6 mt-6">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             <Card className="bg-card border-border">
               <CardContent className="px-4 py-3">
@@ -231,24 +251,6 @@ export default function PartidaPage() {
                 </p>
               </CardContent>
             </Card>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto pb-4">
-          <div className="flex min-w-max gap-4">
-            {activeMatch.players.map((player) => (
-              <div key={player.playerId} className="w-[230px] shrink-0">
-                <PlayerColumn
-                  player={player}
-                  allPlayers={activeMatch.players}
-                  onAddPoints={(points) => addPoints(player.playerId, points)}
-                  onRemoveRound={(roundId) => removeRound(player.playerId, roundId)}
-                  onBat={() => playerBat(player.playerId)}
-                  onPurchase={() => playerPurchase(player.playerId)}
-                  onEliminate={() => eliminatePlayer(player.playerId)}
-                />
-              </div>
-            ))}
           </div>
         </div>
 

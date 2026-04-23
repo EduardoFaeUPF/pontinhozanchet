@@ -79,7 +79,7 @@ export function PlayerColumn({
             Compras {player.purchases}
           </div>
 
-          <h3 className="truncate text-lg font-bold tracking-wide text-yellow-100">
+          <h3 className="truncate text-3xl font-bold tracking-wide text-yellow-100">
             {player.playerName}
           </h3>
 
@@ -111,7 +111,7 @@ export function PlayerColumn({
                     R{index + 1}
                   </span>
 
-                  <span className={`text-base font-bold ${round.points >= 30 ? 'text-red-300' : 'text-yellow-50'}`}>
+                  <span className={`text-2xl font-bold ${round.points >= 30 ? 'text-red-300' : 'text-yellow-50'}`}>
                     {round.points}
                   </span>
 
@@ -209,7 +209,7 @@ export function PlayerColumn({
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-center">
               <div className="text-[11px] uppercase tracking-[0.16em] text-emerald-300/80">Total</div>
-              <div className="text-xl font-extrabold text-emerald-300">
+              <div className="text-3xl font-extrabold text-emerald-300">
                 {player.totalPoints}
               </div>
             </div>
@@ -225,7 +225,7 @@ export function PlayerColumn({
               <div className="text-[11px] uppercase tracking-[0.16em] text-yellow-200/80">
                 {hasBurst ? 'Status' : 'Faltam'}
               </div>
-              <div className={`text-sm font-bold ${hasBurst ? 'text-red-300' : 'text-yellow-200'}`}>
+              <div className={`text-3xl font-bold ${hasBurst ? 'text-red-300' : 'text-yellow-200'}`}>
                 {hasBurst ? 'ESTOUROU' : pointsRemaining}
               </div>
             </div>
